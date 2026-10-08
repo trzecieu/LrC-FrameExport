@@ -4,7 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from zipfile import ZipFile
+from zipfile import ZIP_STORED, ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from package_release import package_release
@@ -31,18 +31,22 @@ class ReleaseTests(unittest.TestCase):
         with ZipFile(archive) as release:
             self.assertIsNone(release.testzip())
             expected = {"README.md", *(
-                "FrameExport.lrplugin/" + name
-                for name in ("Info.lua", "Frame.lua", "ExportFilter.lua", "Magick.lua")
+                path.relative_to(self.root).as_posix()
+                for path in (self.root / "FrameExport.lrplugin").glob("*.lua")
             )}
             self.assertEqual(set(release.namelist()), expected)
             for name in expected:
                 self.assertEqual(release.read(name), (self.root / name).read_bytes())
+                self.assertEqual(release.getinfo(name).compress_type, ZIP_STORED)
             release.extractall(self.output / "extracted")
         self.assertTrue((self.output / "extracted/FrameExport.lrplugin/Info.lua").is_file())
         self.assertEqual(
             checksum.read_text(),
             f"{hashlib.sha256(archive.read_bytes()).hexdigest()}  {archive.name}\n",
         )
+        self.assertEqual((self.output / "FrameExport-update.txt").read_text(),
+                         "FrameExport update manifest 1\nversion=v1.1.0\n"
+                         f"archive={archive.name}\nsha256={hashlib.sha256(archive.read_bytes()).hexdigest()}\n")
 
     def test_rejects_mismatched_version_before_writing(self):
         with self.assertRaisesRegex(ValueError, "must match VERSION"):

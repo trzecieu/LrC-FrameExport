@@ -58,6 +58,7 @@ local imports = {
 imports.LrTasks.startAsyncTask = function(task) task() end
 function import(name) return assert(imports[name], name) end
 _PLUGIN = { path = 'FrameExport.lrplugin' }
+package.path = _PLUGIN.path .. '/?.lua;' .. package.path
 WIN_ENV = false
 local provider = dofile('FrameExport.lrplugin/ExportFilter.lua')
 local function run(path, overrides, sourceSuccess)
@@ -124,6 +125,23 @@ check(not result.ok and result.err == 'render failed', 'Upstream failure propaga
 path = root .. '/rollback.tif'; create(path, '100x80'); original = read(path)
 failInstall = true; result = run(path); failInstall = false
 check(not result.ok and read(path) == original, 'Failed replacement rolls back')
+local runtime = require 'Runtime'
+check(runtime.activeExports == 0, 'Export count returns to zero after failure')
+runtime.installing = true
+result = run(path)
+check(not result.ok and read(path) == original, 'Exports blocked during installation')
+runtime.installing, runtime.pendingReload = false, true
+result = run(path)
+check(not result.ok and read(path) == original, 'Exports blocked until reload')
+runtime.pendingReload = false
+local cleanup
+local failedBatch = pcall(provider.postProcessRenderedPhotos,
+    { addCleanupHandler = function(_, fn) cleanup = fn end },
+    { propertyTable = { frameWidthPercent = 0, frameColor = '#FFFFFF' },
+      renditions = function() error('injected batch failure') end })
+check(not failedBatch and runtime.activeExports == 0, 'Unexpected batch error releases export count')
+cleanup()
+check(runtime.activeExports == 0, 'Context cleanup is idempotent')
 for _, bad in ipairs({ -1, 201, 'abc' }) do
     check(not Frame.validate(bad, '#FFFFFF', '/usr/bin/magick'), 'Invalid percentage')
 end

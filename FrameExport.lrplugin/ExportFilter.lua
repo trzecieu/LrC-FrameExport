@@ -7,6 +7,7 @@ local LrDialogs = import 'LrDialogs'
 local Frame = dofile(LrPathUtils.child(_PLUGIN.path, 'Frame.lua'))
 local Magick = dofile(LrPathUtils.child(_PLUGIN.path, 'Magick.lua'))
 local provider = {}
+local runtime = require 'Runtime'
 
 provider.exportPresetFields = {
     { key = 'frameWidthPercent', default = 10 },
@@ -119,7 +120,7 @@ local function process(options, path, settings)
     if not ok then error(err) end
 end
 
-function provider.postProcessRenderedPhotos(functionContext, filterContext)
+local function processBatch(functionContext, filterContext)
     local p = filterContext.propertyTable
     local options, validationError = Frame.validate(p.frameWidthPercent, p.frameColor, p.frameMagick)
     if options and options.width ~= 0 then
@@ -143,6 +144,33 @@ function provider.postProcessRenderedPhotos(functionContext, filterContext)
             end
         end
     end
+end
+
+function provider.postProcessRenderedPhotos(functionContext, filterContext)
+    if runtime.installing or runtime.pendingReload then
+        local reason = runtime.recoveryRequired
+            and 'Restore the FrameExport backup before reloading the plugin; the update rollback did not finish.'
+            or runtime.pendingReload
+            and 'Reload FrameExport or restart Lightroom after updating before exporting.'
+            or 'FrameExport is installing an update. Try exporting again after reloading the plugin.'
+        for source, rendition in filterContext:renditions { stopIfCanceled = true } do
+            source:waitForRender()
+            rendition:renditionIsDone(false, reason)
+        end
+        return
+    end
+    runtime.activeExports = runtime.activeExports + 1
+    local released = false
+    local function release()
+        if released then return end
+        released = true
+        runtime.activeExports = runtime.activeExports - 1
+        if runtime.refresh then runtime.refresh() end
+    end
+    if functionContext.addCleanupHandler then functionContext:addCleanupHandler(release) end
+    local ok, err = LrTasks.pcall(processBatch, functionContext, filterContext)
+    release()
+    if not ok then error(err) end
 end
 
 return provider

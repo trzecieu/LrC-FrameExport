@@ -40,10 +40,11 @@ PSD, DNG, and Original exports are not supported. The plugin reports an export e
 
 ## Releases
 
-The GitHub Actions release workflow attaches two files to a release:
+The GitHub Actions release workflow attaches three files to a release:
 
 - `FrameExport-vX.Y.Z.zip`, containing `FrameExport.lrplugin/` and this README. Extract the ZIP before adding the plugin to Lightroom. ImageMagick is installed separately.
 - `FrameExport-vX.Y.Z.zip.sha256`, containing the ZIP's SHA-256 checksum.
+- `FrameExport-update.txt`, containing the version, archive name and SHA-256 for the built-in updater.
 
 GitHub also provides its usual source archives; use the **FrameExport ZIP asset** for installation. GitHub release assets are files, so the plugin folder is delivered inside that ZIP.
 
@@ -51,8 +52,8 @@ To publish a version, update `VERSION` in `FrameExport.lrplugin/Info.lua`, commi
 
 ```sh
 # Example for the current plugin version:
-git tag v1.1.1
-git push origin v1.1.1
+git tag v1.2.0
+git push origin v1.2.0
 ```
 
 Use `vMAJOR.MINOR.PATCH`, matching the plugin version. The workflow verifies the version, packages the plugin, and creates a GitHub release with generated notes, or uploads the assets to an existing release. Publishing a release in GitHub also triggers packaging. To rebuild assets for an existing tag, run **Release plugin** from the Actions tab and provide that tag. These triggers use the workflow at the selected tag; the tagged commit must contain the workflow and packaging script.
@@ -61,10 +62,24 @@ Local packaging requires only Python 3:
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_release.py'
-python3 scripts/package_release.py --tag v1.1.1 --output-dir /tmp/frameexport-release
+python3 scripts/package_release.py --tag v1.2.0 --output-dir /tmp/frameexport-release
 ```
 
 Adding the workflow does not publish a version by itself. A tag push, published release, or manual workflow run starts publication.
+
+## Updating the plugin
+
+Starting with version 1.2.0, FrameExport quietly checks the latest stable GitHub release once a day while Lightroom is running. It also checks when the plugin loads if the previous check was at least a day ago. **There are no popup notifications, and updates are not installed automatically.**
+
+In **File → Plug-in Manager → FrameExport**, the **FrameExport updates** section shows the installed version and update status. Use **Check for updates** to check immediately, or **Install update** when a newer release is available. The automatic daily check can be disabled there. The check only requests release metadata; it does not upload photos or catalog data. Offline/network failures appear in this section and do not interrupt exports.
+
+Installation waits for any active FrameExport export batches to finish and blocks new batches while updating. It downloads the release ZIP over HTTPS, verifies SHA-256 from the release manifest, validates the archive paths, plugin identity and version, then stages the files and backs up the installed plugin before replacing any files. ZIPs use uncompressed entries so installation requires no external ZIP utility, Python or ImageMagick.
+
+After installation, **reload the plugin in Plug-in Manager or restart Lightroom**. Exports remain blocked until the new code is loaded, to avoid mixing old and new modules. The toolkit identifier and export preset keys stay the same, so existing presets remain usable.
+
+The prior version is retained in a sibling folder such as `FrameExport.lrplugin.backup-v1.2.0`; its actual path is displayed in Plug-in Manager. Local files are preserved and included in the backup. Write access to the plugin folder and its parent is required. On installation failure, FrameExport attempts to restore the previous files. If restoration also fails, restore the retained backup before reloading or restarting Lightroom. To restore manually, close Lightroom, replace the installed folder with the backup's contents, and reopen Lightroom.
+
+Versions before 1.2.0 do not contain the updater: install version 1.2.0 manually once to enable this feature. Updates are taken from the latest stable GitHub release; prereleases are not selected. The updater installs the plugin's Lua files and leaves ImageMagick installation management to you.
 
 ## Validation
 
@@ -72,8 +87,11 @@ From the repository root on Linux with ImageMagick 7 and LuaTeX:
 
 ```sh
 luatex --luaonly tests/run.lua
+python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
 The tests run real ImageMagick and check equal border thickness on landscape and portrait photos, border color, preservation of 16-bit TIFF pixels, JPEG output, zero percentage, errors, and file restoration. PATH discovery is tested on Linux; Windows/macOS installation locations and two-way color picker/HEX binding are tested with a simulated SDK. Lightroom Classic and Windows have not been run in this cloud environment.
+
+Updater tests use actual release ZIPs, SHA-256 calculations and file copies, with a simulated Lightroom SDK. They check the daily schedule, quiet error handling, version comparison, archive validation, waiting for exports, backup, rollback, preservation of local files and the reload requirement. Python 3 and Lua 5.1 or LuaTeX are required to run these tests.
 
 Before regular use, test automatic ImageMagick detection, the color picker, saving/loading a preset, and landscape/portrait JPEG and TIFF exports in Lightroom Classic. Check output dimensions, ICC profiles, metadata, and watermark placement. This desktop integration check is necessary and is not replaced by the Linux tests.
