@@ -7,7 +7,7 @@ Lightroom hosts the plugin so that adding a border becomes the final export step
 ## Installation
 
 1. Install ImageMagick 7 from <https://imagemagick.org/script/download.php>. On macOS with Homebrew, run `brew install imagemagick`. On Windows, use the installer from the ImageMagick website.
-2. Download `FrameExport-vX.Y.Z.zip` from the repository's [Releases](https://github.com/trzecieu/ttt/releases) page when a release is available. Extract it and keep the entire `FrameExport.lrplugin` folder in a permanent location. Alternatively, use that folder from a checkout of this repository.
+2. Download `FrameExport-vX.Y.Z.zip` from the repository's [Releases](https://github.com/trzecieu/LrC-FrameExport/releases) page when a release is available. Extract it and keep the entire `FrameExport.lrplugin` folder in a permanent location. Alternatively, use that folder from a checkout of this repository.
 3. In Lightroom Classic, open **File → Plug-in Manager → Add** and select the `FrameExport.lrplugin` folder.
 4. Open **Export**. Under **Post-Process Actions**, add **FrameExport**. Leave the executable path empty for automatic detection; the detection result appears below it.
 5. Select **JPEG** or **TIFF**, set the border percentage and color, and export. Click the color swatch to open Lightroom's native color picker, or enter an exact HEX code next to it. Both controls stay synchronized. You can save these settings in an export preset.
