@@ -1,53 +1,81 @@
-# Ramka przy eksporcie z Lightroom Classic
+# FrameExport for Lightroom Classic
 
-Plugin dodaje jednolitą ramkę do eksportowanych zdjęć. Działa jako **filtr eksportu Lightroom Classic** na macOS i Windows; nie zmienia zdjęcia w katalogu ani jego ustawień Develop. Nie obsługuje Lightroom w wersji chmurowej/mobile, która nie udostępnia tego SDK.
+FrameExport adds a solid border to exported photos. It runs as a **Lightroom Classic export filter** on macOS and Windows, without changing the catalog photo or its Develop settings. Lightroom cloud and mobile editions do not support this plugin SDK.
 
-Lightroom jest hostem, ponieważ ramka stanowi ostatni etap eksportu i można zapisać jej parametry razem z presetem. Photoshop wymagałby dodatkowego uruchamiania aplikacji lub ręcznej automatyzacji. Lightroom SDK nie udostępnia operacji dodawania pikseli do płótna, dlatego plugin korzysta z lokalnego **ImageMagick 7**.
+Lightroom hosts the plugin so that adding a border becomes the final export step and its settings can be saved in an export preset. Photoshop would require another application or additional automation. Since the Lightroom SDK cannot extend an image's canvas, the plugin uses a local installation of **ImageMagick 7**.
 
-## Instalacja
+## Installation
 
-1. Zainstaluj ImageMagick 7 z <https://imagemagick.org/script/download.php>. Na macOS z Homebrew: `brew install imagemagick`. Windows: użyj instalatora ze strony ImageMagick.
-2. Plugin sam wyszuka program `magick` i sprawdzi, czy jest to ImageMagick 7 — nie musisz kopiować ścieżki z terminala.
-3. Zachowaj cały folder `FrameExport.lrplugin` w stałym miejscu na dysku.
-4. Lightroom Classic → **File / Plik → Plug-in Manager / Menedżer dodatków → Add / Dodaj** → wybierz ten folder.
-5. Otwórz **Export / Eksportuj**. W obszarze **Post-Process Actions / Działania po przetworzeniu** dodaj filtr **Ramka przy eksporcie**. Pole ścieżki zostaw puste (tryb automatyczny); poniżej zobaczysz wynik wykrywania.
-6. Wybierz eksport **JPEG** lub **TIFF**, ustaw procent i kolor, następnie eksportuj. Kliknięcie próbki koloru otwiera natywny picker Lightrooma. Obok możesz wpisać dokładny kod HEX; oba pola są zsynchronizowane. Możesz zapisać ustawienia jako preset eksportu.
+1. Install ImageMagick 7 from <https://imagemagick.org/script/download.php>. On macOS with Homebrew, run `brew install imagemagick`. On Windows, use the installer from the ImageMagick website.
+2. Download `FrameExport-vX.Y.Z.zip` from the repository's [Releases](https://github.com/trzecieu/ttt/releases) page when a release is available. Extract it and keep the entire `FrameExport.lrplugin` folder in a permanent location. Alternatively, use that folder from a checkout of this repository.
+3. In Lightroom Classic, open **File → Plug-in Manager → Add** and select the `FrameExport.lrplugin` folder.
+4. Open **Export**. Under **Post-Process Actions**, add **Ramka przy eksporcie**. Leave the executable path empty for automatic detection; the detection result appears below it.
+5. Select **JPEG** or **TIFF**, set the border percentage and color, and export. Click the color swatch to open Lightroom's native color picker, or enter an exact HEX code next to it. Both controls stay synchronized. You can save these settings in an export preset.
 
-### Wykrywanie ImageMagick
+The plugin interface currently uses Polish labels; their meaning is explained below.
 
-Plugin szuka w `PATH` procesu Lightrooma, następnie w typowych lokalizacjach Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`), MacPorts (`/opt/local/bin`) lub folderach `ImageMagick-7*` w Windows Program Files. Weryfikuje wersję znalezionego programu. Lightroom otwarty z GUI może mieć inny PATH niż terminal, dlatego sprawdzane są również foldery instalacji.
+### ImageMagick detection
 
-Jeśli program zainstalowano w innym miejscu, przycisk **Wybierz…** otwiera okno wyboru pliku — bez ręcznego wklejania ścieżki. Opcjonalna ścieżka ma pierwszeństwo przed wyszukiwaniem automatycznym. **Wykryj ponownie** czyści ją i uruchamia wyszukiwanie. Przy eksporcie program jest ponownie sprawdzany, niezależnie od komunikatu w oknie. Po aktualizacji pluginu kliknij **Wykryj ponownie**, jeśli stary preset zawiera przykładową ścieżkę z poprzedniej wersji.
+The plugin first searches the Lightroom process's `PATH`, then common Homebrew locations (`/opt/homebrew/bin`, `/usr/local/bin`), MacPorts (`/opt/local/bin`), or `ImageMagick-7*` directories under Windows Program Files. It checks that the executable is ImageMagick 7. Lightroom launched from the desktop may have a different PATH from your terminal, which is why installation directories are also checked.
 
-Nie umieszczaj kolejnego filtra zmieniającego wymiary po tym filtrze. Najpierw testuj na eksporcie do nowego folderu. Dla Windows ścieżki do programu i eksportu nie mogą zawierać `"`, `%` lub `!` — plugin odrzuca je z powodu interpretacji przez powłokę systemową.
+For a custom installation, click **Wybierz…** (Choose…) to select the executable using a file dialog. The optional path takes precedence over automatic detection. **Wykryj ponownie** (Detect again) clears that path and restarts the search. The executable is checked again during export, independently of the status displayed in the dialog. After upgrading the plugin, click Detect again if an old preset contains an example path from the previous version.
 
-## Znaczenie parametrów
+Do not place another filter that changes image dimensions after this filter. Test with exports to a new folder first. On Windows, executable and export paths cannot contain `"`, `%`, or `!`; the plugin rejects these characters because of how the system shell interprets them.
 
-- **Przyrost szerokości (%)**: łączny przyrost szerokości płótna, liczony względem szerokości wyeksportowanego zdjęcia, po połowie z lewej i prawej. **Ta sama grubość w pikselach jest stosowana u góry i u dołu**, niezależnie od proporcji zdjęcia. Jest tylko jeden parametr grubości.
-- **Kolor**: natywny picker lub zapis szesnastkowy `#RRGGBB`, np. `#FFFFFF`, `#000000`, `#E8DCC8`. Wartości są interpretowane w przestrzeni kolorów eksportu; dla przewidywalnego użycia kolorów ekranowych wybierz sRGB. Ramka jest nieprzezroczysta.
-- Zakres procentu: 0–200; ułamki wpisuj z kropką. Grubość krawędzi jest zaokrąglana do najbliższego pełnego piksela. Bardzo mały procent może dać zero pikseli. Procent równy zero pozostawia eksport bez ponownego kodowania i nie wymaga ImageMagick.
+## Border settings
 
-Przykład: zdjęcie **4000 × 3000**, przyrost szerokości **10%** → ramka **200 px na każdej krawędzi**, wynik **4400 × 3400**. Aby uzyskać ramkę 100 px wokół takiego zdjęcia, wpisz 5%.
+- **Przyrost szerokości (%) — Canvas width increase (%)**: the total increase in canvas width, relative to the exported photo's width, split equally between the left and right sides. **The same thickness in pixels is applied to the top and bottom**, regardless of the photo's aspect ratio. There is one thickness setting.
+- **Kolor ramki — Border color**: use the native picker or a hexadecimal `#RRGGBB` value, such as `#FFFFFF`, `#000000`, or `#E8DCC8`. Values are interpreted in the export's color space; choose sRGB for predictable screen colors. The border is opaque.
+- The percentage range is 0–200; use a decimal point for fractional values. Border thickness is rounded to the nearest whole pixel. A very small percentage may produce zero pixels. A percentage of zero leaves the export unchanged, without re-encoding or requiring ImageMagick.
 
-Wzór: `grubość = round(szerokość zdjęcia × procent / 200)`. Wersja 1.1 zachowuje dotychczasowe znaczenie procentu szerokości i ustawienie z presetów; wcześniejszy procent wysokości jest ignorowany. Po aktualizacji warto zapisać preset ponownie.
+Example: a **4000 × 3000** photo with a **10%** canvas width increase gets a **200 px border on every side**, producing a **4400 × 3400** image. For a 100 px border on that photo, enter 5%.
 
-Procenty odnoszą się do pliku **po kadrowaniu i skalowaniu Lightrooma**. Ramka zwiększa jego końcowe wymiary ponad limit ustawiony w Image Sizing. Znak wodny i wyostrzanie Lightrooma są wykonane przed dodaniem ramki; znak wodny pozostaje na zdjęciu, nie na ramce.
+Formula: `thickness = round(photo width × percentage / 200)`. Version 1.1 preserves the previous width percentage semantics and preset setting; the old height percentage is ignored. Consider saving your preset again after upgrading.
 
-## Formaty, jakość i bezpieczeństwo plików
+Percentages apply to the file **after Lightroom's cropping and resizing**. The border increases the final dimensions beyond the limit configured under Image Sizing. Lightroom applies its watermark and output sharpening before the border is added; the watermark stays on the photo rather than on the border.
 
-JPEG jest ponownie kodowany z jakością ustawioną w eksporcie Lightrooma; to dodatkowy etap stratny. Limit rozmiaru JPEG w KB nie jest gwarantowany po dodaniu ramki. Gdy zależy Ci na jakości, eksportuj TIFF: plugin zapisuje go z bezstratną kompresją ZIP, zachowując głębię obrazu. Profile ICC i metadane są przekazywane przez ImageMagick, ale nietypowe metadane należy sprawdzić na własnych plikach; nie gwarantujemy identyczności wszystkich pól.
+## Formats, quality, and file handling
 
-PSD, DNG i Original nie są obsługiwane. Plugin zgłasza błąd eksportu zamiast pozostawić pozornie poprawny wynik bez ramki. Błędy ImageMagick są przekazywane do Lightrooma. Wynik powstaje w pliku tymczasowym obok eksportu; dopiero udane przetwarzanie zastępuje eksport. Przy błędzie podmiany plugin próbuje przywrócić oryginał eksportu; jeżeli to niemożliwe, komunikat wskazuje zachowaną kopię. Wymagane są uprawnienia zapisu w folderze eksportu i miejsce na plik wynikowy oraz kopię eksportu.
+JPEG is re-encoded using the quality selected in Lightroom's export settings, adding another lossy compression step. The JPEG size limit in KB is not guaranteed after adding the border. For maximum quality, export TIFF: the plugin uses lossless ZIP compression and preserves image bit depth. ImageMagick carries over ICC profiles and metadata, but check unusual metadata on your own files; identical preservation of every field is not guaranteed.
 
-## Weryfikacja
+PSD, DNG, and Original exports are not supported. The plugin reports an export error instead of silently leaving an apparently successful result without a border. ImageMagick errors are passed back to Lightroom. Output is first written to a temporary file next to the export and replaces the export only after successful processing. If replacement fails, the plugin attempts to restore the original export; if restoration is impossible, the error identifies the retained backup. The export directory must be writable and have enough space for the output and an export backup.
 
-W środowisku Linux z ImageMagick 7 i LuaTeX:
+## Releases
+
+The GitHub Actions release workflow attaches two files to a release:
+
+- `FrameExport-vX.Y.Z.zip`, containing `FrameExport.lrplugin/` and this README. Extract the ZIP before adding the plugin to Lightroom. ImageMagick is installed separately.
+- `FrameExport-vX.Y.Z.zip.sha256`, containing the ZIP's SHA-256 checksum.
+
+GitHub also provides its usual source archives; use the **FrameExport ZIP asset** for installation. GitHub release assets are files, so the plugin folder is delivered inside that ZIP.
+
+To publish a version, update `VERSION` in `FrameExport.lrplugin/Info.lua`, commit and push the change, then create and push a matching tag:
 
 ```sh
-cd /workspace/ttt
+# Example for the current plugin version:
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+Use `vMAJOR.MINOR.PATCH`, matching the plugin version. The workflow verifies the version, packages the plugin, and creates a GitHub release with generated notes, or uploads the assets to an existing release. Publishing a release in GitHub also triggers packaging. To rebuild assets for an existing tag, run **Release plugin** from the Actions tab and provide that tag. These triggers use the workflow at the selected tag; the tagged commit must contain the workflow and packaging script.
+
+Local packaging requires only Python 3:
+
+```sh
+python3 -m unittest discover -s tests -p 'test_release.py'
+python3 scripts/package_release.py --tag v1.1.0 --output-dir /tmp/frameexport-release
+```
+
+Adding the workflow does not publish a version by itself. A tag push, published release, or manual workflow run starts publication.
+
+## Validation
+
+From the repository root on Linux with ImageMagick 7 and LuaTeX:
+
+```sh
 luatex --luaonly tests/run.lua
 ```
 
-Testy uruchamiają prawdziwy ImageMagick, sprawdzają równą grubość wszystkich krawędzi zdjęć poziomych i pionowych, kolor ramki, zachowanie pikseli TIFF 16-bit, JPEG, zerowy procent, błędy i przywracanie pliku. Wykrywanie programu w PATH jest testowane na Linuxie; lokalizacje Windows/macOS i dwukierunkowe wiązanie pickera z HEX są sprawdzane z symulowanym SDK. Lightroom Classic i Windows nie zostały uruchomione w tym środowisku.
+The tests run real ImageMagick and check equal border thickness on landscape and portrait photos, border color, preservation of 16-bit TIFF pixels, JPEG output, zero percentage, errors, and file restoration. PATH discovery is tested on Linux; Windows/macOS installation locations and two-way color picker/HEX binding are tested with a simulated SDK. Lightroom Classic and Windows have not been run in this cloud environment.
 
-Przed regularnym użyciem przetestuj w Lightroom Classic automatyczne wykrywanie ImageMagick, wybór koloru, zapis/odczyt presetu oraz eksport zdjęcia poziomego i pionowego w JPEG i TIFF. Sprawdź wynikowe wymiary, profil ICC, metadane i pozycję znaku wodnego. To konieczny test integracji z rzeczywistym hostem, którego nie zastępują testy Linux.
+Before regular use, test automatic ImageMagick detection, the color picker, saving/loading a preset, and landscape/portrait JPEG and TIFF exports in Lightroom Classic. Check output dimensions, ICC profiles, metadata, and watermark placement. This desktop integration check is necessary and is not replaced by the Linux tests.

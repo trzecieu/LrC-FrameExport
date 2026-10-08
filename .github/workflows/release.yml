@@ -1,0 +1,56 @@
+name: Release plugin
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag (vMAJOR.MINOR.PATCH)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out the tagged version
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - name: Test packaging
+        run: python3 -m unittest discover -s tests -p 'test_release.py'
+
+      - name: Build plugin ZIP and checksum
+        run: python3 scripts/package_release.py --tag "$RELEASE_TAG" --output-dir dist
+
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          archive="dist/FrameExport-${RELEASE_TAG}.zip"
+          checksum="${archive}.sha256"
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$archive" "$checksum" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$archive" "$checksum" \
+              --verify-tag --title "FrameExport ${RELEASE_TAG}" --generate-notes
+          fi
