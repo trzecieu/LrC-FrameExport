@@ -1,20 +1,32 @@
 -- Pure Lua helpers, also exercised outside Lightroom by tests/run.lua.
 local Frame = {}
 
-function Frame.validate(width, height, color, executable)
-    width, height = tonumber(width), tonumber(height)
-    for _, value in ipairs({ width or false, height or false }) do
-        if type(value) ~= 'number' or value ~= value or value < 0 or value > 200 then
-            return nil, 'Procenty muszą być liczbami od 0 do 200 (użyj kropki dziesiętnej).'
-        end
+function Frame.validate(width, color, executable)
+    width = tonumber(width)
+    if not width or width ~= width or width < 0 or width > 200 then
+        return nil, 'Procent musi być liczbą od 0 do 200 (użyj kropki dziesiętnej).'
     end
     if type(color) ~= 'string' or not color:match('^#%x%x%x%x%x%x$') then
         return nil, 'Kolor musi mieć postać #RRGGBB, np. #FFFFFF.'
     end
-    if type(executable) ~= 'string' or executable == '' then
-        return nil, 'Wskaż pełną ścieżkę do programu ImageMagick 7 (magick).'
+    executable = executable or ''
+    if type(executable) ~= 'string' then
+        return nil, 'Nieprawidłowa ścieżka ImageMagick.'
     end
-    return { width = width, height = height, color = color, executable = executable }
+    return { width = width, color = color, executable = executable }
+end
+
+function Frame.hexToRgb(value)
+    if type(value) ~= 'string' or not value:match('^#%x%x%x%x%x%x$') then return nil end
+    return tonumber(value:sub(2, 3), 16) / 255,
+        tonumber(value:sub(4, 5), 16) / 255, tonumber(value:sub(6, 7), 16) / 255
+end
+
+function Frame.rgbToHex(red, green, blue)
+    local byte = function(value)
+        return math.floor(math.max(0, math.min(1, value)) * 255 + 0.5)
+    end
+    return string.format('#%02X%02X%02X', byte(red), byte(green), byte(blue))
 end
 
 function Frame.quote(value, windows)
@@ -33,7 +45,7 @@ function Frame.command(options, input, output, log, windows, format, quality)
     local quote = function(v) return Frame.quote(v, windows) end
     assert(options.pixelWidth and options.pixelHeight, 'Brak wymiarów eksportu')
     local horizontal = math.floor(options.pixelWidth * options.width / 200 + 0.5)
-    local vertical = math.floor(options.pixelHeight * options.height / 200 + 0.5)
+    local vertical = horizontal
     local parts = { quote(options.executable), quote(input),
         '-bordercolor', quote(options.color),
         '-border', quote(tostring(horizontal) .. 'x' .. tostring(vertical)) }

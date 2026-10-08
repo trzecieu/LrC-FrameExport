@@ -7,22 +7,29 @@ Lightroom jest hostem, ponieważ ramka stanowi ostatni etap eksportu i można za
 ## Instalacja
 
 1. Zainstaluj ImageMagick 7 z <https://imagemagick.org/script/download.php>. Na macOS z Homebrew: `brew install imagemagick`. Windows: użyj instalatora ze strony ImageMagick.
-2. Sprawdź pełną ścieżkę do `magick`: na macOS `command -v magick`, na Windows `where magick`. W terminalu uruchom znaleziony program z `-version`.
+2. Plugin sam wyszuka program `magick` i sprawdzi, czy jest to ImageMagick 7 — nie musisz kopiować ścieżki z terminala.
 3. Zachowaj cały folder `FrameExport.lrplugin` w stałym miejscu na dysku.
 4. Lightroom Classic → **File / Plik → Plug-in Manager / Menedżer dodatków → Add / Dodaj** → wybierz ten folder.
-5. Otwórz **Export / Eksportuj**. W obszarze **Post-Process Actions / Działania po przetworzeniu** dodaj filtr **Ramka przy eksporcie**. W sekcji filtra wpisz rzeczywistą pełną ścieżkę do `magick` (domyślna jest tylko przykładem).
-6. Wybierz eksport **JPEG** lub **TIFF**, ustaw procenty i kolor, następnie eksportuj. Możesz zapisać ustawienia jako preset eksportu.
+5. Otwórz **Export / Eksportuj**. W obszarze **Post-Process Actions / Działania po przetworzeniu** dodaj filtr **Ramka przy eksporcie**. Pole ścieżki zostaw puste (tryb automatyczny); poniżej zobaczysz wynik wykrywania.
+6. Wybierz eksport **JPEG** lub **TIFF**, ustaw procent i kolor, następnie eksportuj. Kliknięcie próbki koloru otwiera natywny picker Lightrooma. Obok możesz wpisać dokładny kod HEX; oba pola są zsynchronizowane. Możesz zapisać ustawienia jako preset eksportu.
+
+### Wykrywanie ImageMagick
+
+Plugin szuka w `PATH` procesu Lightrooma, następnie w typowych lokalizacjach Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`), MacPorts (`/opt/local/bin`) lub folderach `ImageMagick-7*` w Windows Program Files. Weryfikuje wersję znalezionego programu. Lightroom otwarty z GUI może mieć inny PATH niż terminal, dlatego sprawdzane są również foldery instalacji.
+
+Jeśli program zainstalowano w innym miejscu, przycisk **Wybierz…** otwiera okno wyboru pliku — bez ręcznego wklejania ścieżki. Opcjonalna ścieżka ma pierwszeństwo przed wyszukiwaniem automatycznym. **Wykryj ponownie** czyści ją i uruchamia wyszukiwanie. Przy eksporcie program jest ponownie sprawdzany, niezależnie od komunikatu w oknie. Po aktualizacji pluginu kliknij **Wykryj ponownie**, jeśli stary preset zawiera przykładową ścieżkę z poprzedniej wersji.
 
 Nie umieszczaj kolejnego filtra zmieniającego wymiary po tym filtrze. Najpierw testuj na eksporcie do nowego folderu. Dla Windows ścieżki do programu i eksportu nie mogą zawierać `"`, `%` lub `!` — plugin odrzuca je z powodu interpretacji przez powłokę systemową.
 
 ## Znaczenie parametrów
 
-- **Szerokość (%)**: łączny przyrost szerokości płótna, liczony względem szerokości wyeksportowanego zdjęcia, po połowie z lewej i prawej.
-- **Wysokość (%)**: analogicznie, po połowie u góry i u dołu.
-- **Kolor**: zapis szesnastkowy `#RRGGBB`, np. `#FFFFFF`, `#000000`, `#E8DCC8`. Wartości są interpretowane w przestrzeni kolorów eksportu; dla przewidywalnego użycia kolorów ekranowych wybierz sRGB.
-- Zakres procentów: 0–200; ułamki wpisuj z kropką. Każda krawędź jest zaokrąglana do najbliższego pełnego piksela. Bardzo mały procent może dać zero pikseli. Oba parametry równe zero pozostawiają eksport bez ponownego kodowania.
+- **Przyrost szerokości (%)**: łączny przyrost szerokości płótna, liczony względem szerokości wyeksportowanego zdjęcia, po połowie z lewej i prawej. **Ta sama grubość w pikselach jest stosowana u góry i u dołu**, niezależnie od proporcji zdjęcia. Jest tylko jeden parametr grubości.
+- **Kolor**: natywny picker lub zapis szesnastkowy `#RRGGBB`, np. `#FFFFFF`, `#000000`, `#E8DCC8`. Wartości są interpretowane w przestrzeni kolorów eksportu; dla przewidywalnego użycia kolorów ekranowych wybierz sRGB. Ramka jest nieprzezroczysta.
+- Zakres procentu: 0–200; ułamki wpisuj z kropką. Grubość krawędzi jest zaokrąglana do najbliższego pełnego piksela. Bardzo mały procent może dać zero pikseli. Procent równy zero pozostawia eksport bez ponownego kodowania i nie wymaga ImageMagick.
 
-Przykład: zdjęcie **4000 × 3000**, szerokość **10%**, wysokość **20%** → lewa/prawa ramka **200 px**, górna/dolna **300 px**, wynik **4400 × 3600**. Równe procenty przy prostokątnym zdjęciu dają różne grubości w pikselach. Aby uzyskać ramkę 100 px wokół zdjęcia 4000 × 3000, wpisz 5% i 6.6667%.
+Przykład: zdjęcie **4000 × 3000**, przyrost szerokości **10%** → ramka **200 px na każdej krawędzi**, wynik **4400 × 3400**. Aby uzyskać ramkę 100 px wokół takiego zdjęcia, wpisz 5%.
+
+Wzór: `grubość = round(szerokość zdjęcia × procent / 200)`. Wersja 1.1 zachowuje dotychczasowe znaczenie procentu szerokości i ustawienie z presetów; wcześniejszy procent wysokości jest ignorowany. Po aktualizacji warto zapisać preset ponownie.
 
 Procenty odnoszą się do pliku **po kadrowaniu i skalowaniu Lightrooma**. Ramka zwiększa jego końcowe wymiary ponad limit ustawiony w Image Sizing. Znak wodny i wyostrzanie Lightrooma są wykonane przed dodaniem ramki; znak wodny pozostaje na zdjęciu, nie na ramce.
 
@@ -41,6 +48,6 @@ cd /workspace/ttt
 luatex --luaonly tests/run.lua
 ```
 
-Testy uruchamiają prawdziwy ImageMagick, sprawdzają wymiary i kolor ramki, zachowanie pikseli TIFF 16-bit, JPEG, zerowe procenty, błędy i przywracanie pliku. Warstwa SDK Lightrooma jest symulowana. Lightroom Classic i Windows nie zostały uruchomione w tym środowisku.
+Testy uruchamiają prawdziwy ImageMagick, sprawdzają równą grubość wszystkich krawędzi zdjęć poziomych i pionowych, kolor ramki, zachowanie pikseli TIFF 16-bit, JPEG, zerowy procent, błędy i przywracanie pliku. Wykrywanie programu w PATH jest testowane na Linuxie; lokalizacje Windows/macOS i dwukierunkowe wiązanie pickera z HEX są sprawdzane z symulowanym SDK. Lightroom Classic i Windows nie zostały uruchomione w tym środowisku.
 
-Przed regularnym użyciem przetestuj w Lightroom Classic eksport jednego zdjęcia JPEG i TIFF oraz preset z własnym kolorem. Sprawdź wynikowe wymiary, profil ICC, metadane i pozycję znaku wodnego. To konieczny test integracji z rzeczywistym hostem, którego nie zastępują testy Linux.
+Przed regularnym użyciem przetestuj w Lightroom Classic automatyczne wykrywanie ImageMagick, wybór koloru, zapis/odczyt presetu oraz eksport zdjęcia poziomego i pionowego w JPEG i TIFF. Sprawdź wynikowe wymiary, profil ICC, metadane i pozycję znaku wodnego. To konieczny test integracji z rzeczywistym hostem, którego nie zastępują testy Linux.
