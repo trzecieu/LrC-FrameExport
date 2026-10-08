@@ -27,7 +27,7 @@ function Magick.find(manual, windows)
             return status == 0 and report:match('Version: ImageMagick 7%.') ~= nil
         end
         if manual and manual ~= '' then
-            assert(probe(manual), 'Podana ścieżka nie wskazuje działającego ImageMagick 7: ' .. manual)
+            assert(probe(manual), 'The specified path does not point to a working ImageMagick 7 executable: ' .. manual)
             return manual
         end
         local _, report = run(windows and 'where.exe magick.exe' or 'command -v magick')
@@ -55,8 +55,8 @@ function Magick.find(manual, windows)
             end
         end
         for _, path in ipairs(candidates) do if probe(path) then return path end end
-        error('Nie znaleziono ImageMagick 7. Zainstaluj go i kliknij „Wykryj ponownie”, '
-            .. 'albo wybierz program przyciskiem „Wybierz…”.')
+        error('ImageMagick 7 was not found. Install it and click Detect again, '
+            .. 'or select the executable using Choose….')
     end)
     LrFileUtils.delete(log)
     if not ok then error(result) end

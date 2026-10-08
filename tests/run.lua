@@ -202,14 +202,14 @@ end
 factory.control_spacing = function() return 6 end
 local props = { frameMagick = '', frameWidthPercent = 10, frameColor = '#1A80FF' }
 local section = provider.sectionForFilterInDialog(factory, props)
-check(props.frameMagickStatus:match('Znaleziono:'), 'Dialog automatically starts discovery')
+check(props.frameMagickStatus:match('Found:'), 'Dialog automatically starts discovery')
 local swatch, hexField, pickerButton, detectButton
 local function visit(node)
     if type(node) ~= 'table' then return end
     if node.kind == 'color_well' then swatch = node end
     if node.kind == 'edit_field' and node.value == 'frameColor' then hexField = node end
-    if node.kind == 'push_button' and node.title == 'Wybierz…' then pickerButton = node end
-    if node.kind == 'push_button' and node.title == 'Wykryj ponownie' then detectButton = node end
+    if node.kind == 'push_button' and node.title == 'Choose…' then pickerButton = node end
+    if node.kind == 'push_button' and node.title == 'Detect again' then detectButton = node end
     for _, child in ipairs(node) do visit(child) end
 end
 visit(section)
@@ -226,7 +226,7 @@ imports.LrDialogs.runOpenPanel = function() return nil end
 pickerButton.action()
 check(props.frameMagick == custom, 'Cancel executable picker preserves setting')
 detectButton.action()
-check(props.frameMagick == '' and props.frameMagickStatus:match('Znaleziono:'), 'Reset restores automatic detection')
+check(props.frameMagick == '' and props.frameMagickStatus:match('Found:'), 'Reset restores automatic detection')
 check(execute('find ' .. q(root) .. " -name '*.frame*' | rg . > /dev/null") ~= 0, 'No temporary files remain')
 assert(execute('rm -r ' .. q(root)) == 0)
 print('PASS: ' .. tests .. ' checks (real ImageMagick; Lightroom SDK mocked)')

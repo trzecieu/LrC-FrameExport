@@ -18,27 +18,27 @@ function provider.sectionForFilterInDialog(f, properties)
     local bind = LrView.bind
     local function detect()
         local manual = properties.frameMagick
-        properties.frameMagickStatus = 'Szukam ImageMagick 7…'
+        properties.frameMagickStatus = 'Searching for ImageMagick 7…'
         LrTasks.startAsyncTask(function()
             local ok, path = LrTasks.pcall(Magick.find, manual, WIN_ENV)
             if properties.frameMagick == manual then
-                properties.frameMagickStatus = ok and ('Znaleziono: ' .. path) or tostring(path)
+                properties.frameMagickStatus = ok and ('Found: ' .. path) or tostring(path)
             end
         end)
     end
     detect()
     return {
-        title = 'Ramka przy eksporcie',
+        title = 'FrameExport',
         f:column {
             bind_to_object = properties,
             spacing = f:control_spacing(),
-            f:static_text { title = 'Jednakowa grubość ramki w pikselach na wszystkich czterech krawędziach.' },
+            f:static_text { title = 'Equal border thickness in pixels on all four edges.' },
             f:row {
-                f:static_text { title = 'Przyrost szerokości (%)', width = 165 },
+                f:static_text { title = 'Canvas width increase (%)', width = 165 },
                 f:edit_field { value = bind 'frameWidthPercent', width_in_chars = 8 },
             },
             f:row {
-                f:static_text { title = 'Kolor ramki', width = 165 },
+                f:static_text { title = 'Border color', width = 165 },
                 f:color_well {
                     value = bind {
                         key = 'frameColor',
@@ -54,11 +54,11 @@ function provider.sectionForFilterInDialog(f, properties)
                 f:edit_field { value = bind 'frameColor', width_in_chars = 12 },
             },
             f:row {
-                f:static_text { title = 'Ścieżka (opcjonalna)', width = 165 },
+                f:static_text { title = 'Path (optional)', width = 165 },
                 f:edit_field { value = bind 'frameMagick', width_in_chars = 35 },
-                f:push_button { title = 'Wybierz…', action = function()
+                f:push_button { title = 'Choose…', action = function()
                     local paths = LrDialogs.runOpenPanel {
-                        title = 'Wybierz program ImageMagick 7 (magick)',
+                        title = 'Choose the ImageMagick 7 executable (magick)',
                         canChooseFiles = true, canChooseDirectories = false,
                         allowsMultipleSelection = false,
                     }
@@ -66,14 +66,14 @@ function provider.sectionForFilterInDialog(f, properties)
                 end },
             },
             f:row {
-                f:push_button { title = 'Wykryj ponownie', action = function()
+                f:push_button { title = 'Detect again', action = function()
                     properties.frameMagick = ''; detect()
                 end },
-                f:static_text { title = 'Puste pole = szukanie w PATH i typowych folderach instalacji.' },
+                f:static_text { title = 'Leave empty to search PATH and common installation folders.' },
             },
             f:static_text { title = bind 'frameMagickStatus', width_in_chars = 60, height_in_lines = -1 },
-            f:static_text { title = 'ImageMagick 7 • JPEG / TIFF • ramka po skalowaniu i znaku wodnym' },
-            f:static_text { title = '10% dodaje na każdej krawędzi 5% szerokości zdjęcia — również u góry i u dołu.' },
+            f:static_text { title = 'ImageMagick 7 • JPEG / TIFF • border after resizing and watermarking' },
+            f:static_text { title = '10% adds 5% of photo width to every edge, including top and bottom.' },
         },
     }
 end
@@ -81,9 +81,9 @@ end
 local function process(options, path, settings)
     if options.width == 0 then return end
     assert(settings.LR_format == 'JPEG' or settings.LR_format == 'TIFF',
-        'Ramka obsługuje wyłącznie eksport JPEG i TIFF. Wybierz jeden z tych formatów.')
+        'The border filter supports JPEG and TIFF exports only. Select one of these formats.')
     assert(LrFileUtils.exists(options.executable) == 'file',
-        'Nie znaleziono programu magick. Zainstaluj ImageMagick 7 i podaj pełną ścieżkę.')
+        'The magick executable was not found. Install ImageMagick 7 and use Detect again or Choose….')
     -- Keep the suffix: ImageMagick chooses the output encoder from it.
     local suffix = LrPathUtils.extension(path)
     local temporary = LrFileUtils.chooseUniqueFileName(path .. '.frame.' .. suffix)
@@ -91,7 +91,7 @@ local function process(options, path, settings)
     local log = LrFileUtils.chooseUniqueFileName(path .. '.frame.log')
     local ok, err = LrTasks.pcall(function()
         local identified = LrTasks.execute(Frame.identifyCommand(options.executable, path, log, WIN_ENV))
-        assert(identified == 0, 'ImageMagick nie może odczytać eksportu: ' ..
+        assert(identified == 0, 'ImageMagick could not read the exported image: ' ..
             (LrFileUtils.readFile(log) or ''):sub(1, 2000))
         options.pixelWidth, options.pixelHeight = Frame.dimensions(LrFileUtils.readFile(log) or '')
         local command = Frame.command(options, path, temporary, log, WIN_ENV,
@@ -99,18 +99,18 @@ local function process(options, path, settings)
         local status = LrTasks.execute(command)
         if status ~= 0 or LrFileUtils.exists(temporary) ~= 'file' then
             local details = LrFileUtils.readFile(log) or ''
-            error('ImageMagick: kod ' .. tostring(status) .. '. ' .. details:sub(1, 2000))
+            error('ImageMagick: exit code ' .. tostring(status) .. '. ' .. details:sub(1, 2000))
         end
         local moved, reason = LrFileUtils.move(path, backup)
-        assert(moved, reason or 'Nie można zabezpieczyć pliku przed podmianą.')
+        assert(moved, reason or 'Could not back up the file before replacement.')
         local installed, installError = LrFileUtils.move(temporary, path)
         if not installed then
             local restored, restoreError = LrFileUtils.move(backup, path)
             if not restored then
-                error('Nie udało się przywrócić pliku: ' .. tostring(restoreError) ..
-                    '. Oryginał eksportu jest w: ' .. backup)
+                error('Could not restore the file: ' .. tostring(restoreError) ..
+                    '. The original export is saved at: ' .. backup)
             end
-            error(installError or 'Nie można podmienić eksportu.')
+            error(installError or 'Could not replace the exported file.')
         end
         LrFileUtils.delete(backup)
     end)

@@ -4,14 +4,14 @@ local Frame = {}
 function Frame.validate(width, color, executable)
     width = tonumber(width)
     if not width or width ~= width or width < 0 or width > 200 then
-        return nil, 'Procent musi być liczbą od 0 do 200 (użyj kropki dziesiętnej).'
+        return nil, 'Percentage must be a number from 0 to 200 (use a decimal point).'
     end
     if type(color) ~= 'string' or not color:match('^#%x%x%x%x%x%x$') then
-        return nil, 'Kolor musi mieć postać #RRGGBB, np. #FFFFFF.'
+        return nil, 'Color must use #RRGGBB format, for example #FFFFFF.'
     end
     executable = executable or ''
     if type(executable) ~= 'string' then
-        return nil, 'Nieprawidłowa ścieżka ImageMagick.'
+        return nil, 'Invalid ImageMagick path.'
     end
     return { width = width, color = color, executable = executable }
 end
@@ -31,11 +31,11 @@ end
 
 function Frame.quote(value, windows)
     assert(type(value) == 'string', 'Expected a string')
-    assert(not value:find('[%z\r\n]'), 'Niedozwolony znak w ścieżce')
+    assert(not value:find('[%z\r\n]'), 'Invalid character in path')
     if windows then
         -- cmd.exe expands these even inside quotes. Refuse rather than execute
         -- an unexpected command or silently address a different file.
-        assert(not value:find('["%%!]'), 'Ścieżki Windows nie mogą zawierać znaków ", % ani !')
+        assert(not value:find('["%%!]'), 'Windows paths cannot contain ", % or !')
         return '"' .. value .. '"'
     end
     return "'" .. value:gsub("'", "'\\''") .. "'"
@@ -43,7 +43,7 @@ end
 
 function Frame.command(options, input, output, log, windows, format, quality)
     local quote = function(v) return Frame.quote(v, windows) end
-    assert(options.pixelWidth and options.pixelHeight, 'Brak wymiarów eksportu')
+    assert(options.pixelWidth and options.pixelHeight, 'Missing export dimensions')
     local horizontal = math.floor(options.pixelWidth * options.width / 200 + 0.5)
     local vertical = horizontal
     local parts = { quote(options.executable), quote(input),
@@ -51,7 +51,7 @@ function Frame.command(options, input, output, log, windows, format, quality)
         '-border', quote(tostring(horizontal) .. 'x' .. tostring(vertical)) }
     if format == 'JPEG' then
         quality = tonumber(quality) or 0.9
-        assert(quality >= 0 and quality <= 1, 'Nieprawidłowa jakość JPEG')
+        assert(quality >= 0 and quality <= 1, 'Invalid JPEG quality')
         parts[#parts + 1] = '-quality'
         parts[#parts + 1] = tostring(math.floor(quality * 100 + 0.5))
     elseif format == 'TIFF' then
@@ -74,7 +74,7 @@ end
 
 function Frame.dimensions(report)
     local w, h = report:match('Geometry: (%d+)x(%d+)')
-    assert(w and h, 'Nie można odczytać wymiarów eksportu z ImageMagick.')
+    assert(w and h, 'Could not read export dimensions from ImageMagick.')
     return tonumber(w), tonumber(h)
 end
 
