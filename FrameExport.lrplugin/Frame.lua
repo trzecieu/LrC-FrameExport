@@ -1,7 +1,7 @@
 -- Pure Lua helpers, also exercised outside Lightroom by tests/run.lua.
 local Frame = {}
 
-function Frame.validate(width, color, executable)
+function Frame.validate(width, color, executable, mode)
     width = tonumber(width)
     if not width or width ~= width or width < 0 or width > 200 then
         return nil, 'Percentage must be a number from 0 to 200 (use a decimal point).'
@@ -13,7 +13,11 @@ function Frame.validate(width, color, executable)
     if type(executable) ~= 'string' then
         return nil, 'Invalid ImageMagick path.'
     end
-    return { width = width, color = color, executable = executable }
+    mode = mode or 'outside'
+    if mode ~= 'outside' and mode ~= 'inside' and mode ~= 'outside_fit' then
+        return nil, 'Unknown border type. Select Outside, Inside or Outside (keep dimensions).'
+    end
+    return { width = width, color = color, executable = executable, mode = mode }
 end
 
 function Frame.hexToRgb(value)
@@ -45,10 +49,32 @@ function Frame.command(options, input, output, log, windows, format, quality)
     local quote = function(v) return Frame.quote(v, windows) end
     assert(options.pixelWidth and options.pixelHeight, 'Missing export dimensions')
     local horizontal = math.floor(options.pixelWidth * options.width / 200 + 0.5)
-    local vertical = horizontal
-    local parts = { quote(options.executable), quote(input),
-        '-bordercolor', quote(options.color),
-        '-border', quote(tostring(horizontal) .. 'x' .. tostring(vertical)) }
+    local parts = { quote(options.executable), quote(input) }
+    local function add(...)
+        for _, part in ipairs({ ... }) do parts[#parts + 1] = part end
+    end
+    local mode = options.mode or 'outside'
+    assert(mode == 'outside' or mode == 'inside' or mode == 'outside_fit', 'Unknown border type')
+    if mode == 'outside' then
+        add('-bordercolor', quote(options.color), '-border', quote(horizontal .. 'x' .. horizontal))
+    else
+        local width, height = options.pixelWidth, options.pixelHeight
+        local innerWidth, innerHeight = width - 2 * horizontal, height - 2 * horizontal
+        assert(innerWidth > 0 and innerHeight > 0,
+            'The border is too thick for this image in a fixed-dimensions mode. Reduce the percentage.')
+        if mode == 'inside' and horizontal > 0 then
+            -- Replace the edge pixels with an opaque border, without resampling
+            -- the interior or introducing a vector drawing alpha channel.
+            local border = quote(horizontal .. 'x' .. horizontal)
+            add('-shave', border, '+repage', '-bordercolor', quote(options.color), '-border', border)
+        elseif mode == 'outside_fit' then
+            -- Preserve the entire photo and its aspect ratio within the original
+            -- canvas. The unused area is filled with the border color.
+            add('-resize', quote(innerWidth .. 'x' .. innerHeight),
+                '-background', quote(options.color), '-gravity', 'center',
+                '-extent', quote(width .. 'x' .. height))
+        end
+    end
     if format == 'JPEG' then
         quality = tonumber(quality) or 0.9
         assert(quality >= 0 and quality <= 1, 'Invalid JPEG quality')

@@ -22,15 +22,21 @@ Do not place another filter that changes image dimensions after this filter. Tes
 
 ## Border settings
 
-- **Canvas width increase (%)**: the total increase in canvas width, relative to the exported photo's width, split equally between the left and right sides. **The same thickness in pixels is applied to the top and bottom**, regardless of the photo's aspect ratio. There is one thickness setting.
+- **Border type** selects one of three modes:
+  - **Outside (expand dimensions)** adds an equal border around the full photo without resizing it. The output grows by twice the border thickness on both axes. This is the default, including for presets saved before version 1.3.
+  - **Inside (cover edges)** replaces the photo's edge pixels with the border color. Output dimensions stay unchanged, and the remaining photo pixels are not resized. The border hides part of the photo.
+  - **Outside (keep dimensions)** scales the entire photo down proportionally to fit inside the border, centers it and fills the remaining canvas with the border color. Output dimensions stay unchanged, with no cropping or stretching. The requested thickness is the minimum margin on each side; for rectangular photos, margins on one axis can be wider. Opposite margins can differ by one pixel when centering requires rounding.
+- **Border amount (%)** keeps the previous percentage semantics: each edge's thickness is `round(exported photo width × percentage / 200)`. In the expanding mode, the percentage is the total canvas width increase. Inside mode uses that same pixel thickness to cover the edges, and Keep dimensions uses it as the minimum surrounding margin. There is one thickness setting.
 - **Border color**: use the native picker or a hexadecimal `#RRGGBB` value, such as `#FFFFFF`, `#000000`, or `#E8DCC8`. Values are interpreted in the export's color space; choose sRGB for predictable screen colors. The border is opaque.
 - The percentage range is 0–200; use a decimal point for fractional values. Border thickness is rounded to the nearest whole pixel. A very small percentage may produce zero pixels. A percentage of zero leaves the export unchanged, without re-encoding or requiring ImageMagick.
 
-Example: a **4000 × 3000** photo with a **10%** canvas width increase gets a **200 px border on every side**, producing a **4400 × 3400** image. For a 100 px border on that photo, enter 5%.
+Example: a **4000 × 3000** photo with **10%** has a requested thickness of **200 px**. Outside produces **4400 × 3400** with a 200 px border on every side. Inside stays **4000 × 3000**, covering 200 px of the photo on each side. Keep dimensions also stays **4000 × 3000**; the full photo becomes approximately **3467 × 2600**, surrounded by 200 px top/bottom margins and wider left/right margins. For a requested thickness of 100 px, enter 5%.
+
+Inside and Keep dimensions require space for at least one photo pixel on each axis. If the border is too thick, export reports an error and leaves the original export unchanged; reduce the percentage. A zero percentage leaves the file unchanged in every mode.
 
 Formula: `thickness = round(photo width × percentage / 200)`. Version 1.1 preserves the previous width percentage semantics and preset setting; the old height percentage is ignored. Consider saving your preset again after upgrading.
 
-Percentages apply to the file **after Lightroom's cropping and resizing**. The border increases the final dimensions beyond the limit configured under Image Sizing. Lightroom applies its watermark and output sharpening before the border is added; the watermark stays on the photo rather than on the border.
+Percentages and input dimensions refer to the file **after Lightroom's cropping and resizing**. Outside (expand dimensions) exceeds the dimensions configured under Image Sizing; the other two modes preserve them. Lightroom applies its watermark and output sharpening before the border filter. Inside can cover a watermark near the edges; Keep dimensions resizes the watermark together with the photo. Sharpening for the final resized image is not reapplied by the plugin.
 
 ## Formats, quality, and file handling
 
@@ -52,8 +58,8 @@ To publish a version, update `VERSION` in `FrameExport.lrplugin/Info.lua`, commi
 
 ```sh
 # Example for the current plugin version:
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.3.0
+git push origin v1.3.0
 ```
 
 Use `vMAJOR.MINOR.PATCH`, matching the plugin version. The workflow verifies the version, packages the plugin, and creates a GitHub release with generated notes, or uploads the assets to an existing release. Publishing a release in GitHub also triggers packaging. To rebuild assets for an existing tag, run **Release plugin** from the Actions tab and provide that tag. These triggers use the workflow at the selected tag; the tagged commit must contain the workflow and packaging script.
@@ -62,7 +68,7 @@ Local packaging requires only Python 3:
 
 ```sh
 python3 -m unittest discover -s tests -p 'test_release.py'
-python3 scripts/package_release.py --tag v1.2.0 --output-dir /tmp/frameexport-release
+python3 scripts/package_release.py --tag v1.3.0 --output-dir /tmp/frameexport-release
 ```
 
 Adding the workflow does not publish a version by itself. A tag push, published release, or manual workflow run starts publication.
@@ -91,6 +97,8 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
 The tests run real ImageMagick and check equal border thickness on landscape and portrait photos, border color, preservation of 16-bit TIFF pixels, JPEG output, zero percentage, errors, and file restoration. PATH discovery is tested on Linux; Windows/macOS installation locations and two-way color picker/HEX binding are tested with a simulated SDK. Lightroom Classic and Windows have not been run in this cloud environment.
+
+Border mode tests check inside-edge replacement without resampling, exact input/output dimensions in both fixed-dimensions modes, complete corner preservation and proportional fitting, landscape/portrait layouts, oversized borders, and JPEG/TIFF output.
 
 Updater tests use actual release ZIPs, SHA-256 calculations and file copies, with a simulated Lightroom SDK. They check the daily schedule, quiet error handling, version comparison, archive validation, waiting for exports, backup, rollback, preservation of local files and the reload requirement. Python 3 and Lua 5.1 or LuaTeX are required to run these tests.
 

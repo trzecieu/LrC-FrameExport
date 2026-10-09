@@ -103,6 +103,76 @@ w, h = dimensions(path)
 check(w == 88 and h == 168, 'Equal border width on portrait image')
 check(capture('magick ' .. q(path) .. " -format '%[hex:p{4,4}]' info:"):match('^FFFF00000000'), 'Portrait source starts at equal x/y offset')
 
+local function pixels(path, points)
+    return capture('magick ' .. q(path) .. ' -format ' .. q(points) .. ' info:')
+end
+path = root .. '/inside.tif'; create(path, '200x100')
+result = run(path, { frameMode = 'inside' })
+check(result.ok, result.err)
+w, h = dimensions(path)
+check(w == 200 and h == 100, 'Inside mode preserves input dimensions')
+check(pixels(path, '%[hex:p{9,50}] %[hex:p{100,9}] %[hex:p{190,50}] %[hex:p{100,90}]') ==
+    '0000FFFF0000 0000FFFF0000 0000FFFF0000 0000FFFF0000', 'Inside mode paints exactly ten pixels on all edges')
+check(pixels(path, '%[hex:p{10,10}] %[hex:p{189,89}] %[hex:p{100,50}]') ==
+    'FFFF00000000 FFFF00000000 FFFF00000000', 'Inside mode leaves remaining source pixels untouched')
+path = root .. '/inside-gradient.tif'
+assert(execute('magick -size 200x100 gradient:black-white -depth 16 ' .. q(path)) == 0)
+assert(execute('magick ' .. q(path) .. ' -crop 180x80+10+10 +repage ' .. q(root .. '/before-interior.tif')) == 0)
+result = run(path, { frameMode = 'inside' })
+check(result.ok, result.err)
+assert(execute('magick ' .. q(path) .. ' -crop 180x80+10+10 +repage ' .. q(root .. '/after-interior.tif')) == 0)
+check(execute('magick compare -metric AE ' .. q(root .. '/before-interior.tif') .. ' ' ..
+    q(root .. '/after-interior.tif') .. ' null: 2> ' .. q(root .. '/difference.txt')) == 0,
+    'Inside mode preserves every interior gradient pixel at 16-bit precision')
+
+path = root .. '/fit.tif'; create(path, '200x100')
+assert(execute('magick ' .. q(path) ..
+    " -fill blue -draw 'rectangle 0,0 9,9' -fill yellow -draw 'rectangle 190,90 199,99' -alpha off " .. q(path)) == 0)
+result = run(path, { frameMode = 'outside_fit' })
+check(result.ok, result.err)
+w, h = dimensions(path)
+check(w == 200 and h == 100, 'Outside fit mode preserves exact input dimensions')
+check(pixels(path, '%[hex:p{19,50}] %[hex:p{100,9}] %[hex:p{180,50}] %[hex:p{100,90}]') ==
+    '0000FFFF0000 0000FFFF0000 0000FFFF0000 0000FFFF0000', 'Outside fit fills centered margins with border color')
+check(pixels(path, '%[hex:p{20,10}] %[hex:p{179,89}]') ==
+    '00000000FFFF FFFFFFFF0000', 'Outside fit preserves both opposite photo corners without cropping')
+check(pixels(path, '%[hex:p{20,50}] %[hex:p{100,10}] %[hex:p{179,50}] %[hex:p{100,89}]') ==
+    'FFFF00000000 FFFF00000000 FFFF00000000 FFFF00000000', 'Outside fit preserves aspect ratio with a 160 by 80 photo')
+
+path = root .. '/fit-portrait.tif'; create(path, '100x200')
+result = run(path, { frameMode = 'outside_fit' })
+check(result.ok, result.err)
+w, h = dimensions(path)
+check(w == 100 and h == 200, 'Outside fit preserves portrait dimensions')
+check(pixels(path, '%[hex:p{4,100}] %[hex:p{50,9}] %[hex:p{5,10}]') ==
+    '0000FFFF0000 0000FFFF0000 FFFF00000000', 'Portrait fit centers a 90 by 180 photo with equal opposite margins')
+
+for _, mode in ipairs({ 'inside', 'outside_fit' }) do
+    path = root .. '/too-thick-' .. mode .. '.tif'; create(path, '100x80')
+    local before = read(path)
+    result = run(path, { frameMode = mode, frameWidthPercent = 80 })
+    check(not result.ok and result.err:find('too thick', 1, true) and read(path) == before,
+        'Fixed-dimensions mode rejects borders covering the entire photo: ' .. mode)
+    result = run(path, { frameMode = mode, frameWidthPercent = 0, frameMagick = '/missing/magick' })
+    check(result.ok and read(path) == before, 'Zero border bypasses processing in mode: ' .. mode)
+end
+path = root .. '/thick-outside.tif'; create(path, '100x80')
+result = run(path, { frameMode = 'outside', frameWidthPercent = 80 })
+check(result.ok, result.err)
+w, h = dimensions(path)
+check(w == 180 and h == 160, 'Large outside borders remain supported')
+local before = read(path)
+result = run(path, { frameMode = 'invalid' })
+check(not result.ok and read(path) == before, 'Unknown mode rejected without changing the source')
+
+for _, mode in ipairs({ 'inside', 'outside_fit' }) do
+    path = root .. '/' .. mode .. '.jpg'; create(path, '200x100')
+    result = run(path, { frameMode = mode, LR_format = 'JPEG' })
+    check(result.ok, result.err)
+    w, h = dimensions(path)
+    check(w == 200 and h == 100, 'JPEG output preserves dimensions in mode: ' .. mode)
+end
+
 path = root .. '/photo.jpg'; create(path, '1000x800')
 result = run(path, { LR_format = 'JPEG' })
 check(result.ok, result.err)
@@ -214,23 +284,27 @@ check(not pcall(Magick.find, '', false), 'No installation produces a clear failu
 files.exists, files.readFile, imports.LrTasks.execute = savedExists, savedRead, savedExecute
 
 local factory = {}
-for _, kind in ipairs({ 'column', 'row', 'static_text', 'edit_field', 'color_well', 'push_button' }) do
+for _, kind in ipairs({ 'column', 'row', 'static_text', 'edit_field', 'color_well', 'push_button', 'popup_menu' }) do
     factory[kind] = function(_, props) props.kind = kind; return props end
 end
 factory.control_spacing = function() return 6 end
 local props = { frameMagick = '', frameWidthPercent = 10, frameColor = '#1A80FF' }
 local section = provider.sectionForFilterInDialog(factory, props)
 check(props.frameMagickStatus:match('Found:'), 'Dialog automatically starts discovery')
-local swatch, hexField, pickerButton, detectButton
+local swatch, hexField, pickerButton, detectButton, modeSelector
 local function visit(node)
     if type(node) ~= 'table' then return end
     if node.kind == 'color_well' then swatch = node end
+    if node.kind == 'popup_menu' then modeSelector = node end
     if node.kind == 'edit_field' and node.value == 'frameColor' then hexField = node end
     if node.kind == 'push_button' and node.title == 'Choose…' then pickerButton = node end
     if node.kind == 'push_button' and node.title == 'Detect again' then detectButton = node end
     for _, child in ipairs(node) do visit(child) end
 end
 visit(section)
+check(modeSelector and modeSelector.value == 'frameMode' and #modeSelector.items == 3,
+    'Export dialog exposes exactly three preset-bound border modes')
+check(props.frameMode == 'outside', 'Presets without a mode default to existing outside behavior')
 check(swatch and hexField and swatch.value.key == hexField.value, 'Color picker and HEX bind to same preset property')
 local color = swatch.value.transform(props.frameColor, true)
 check(color:red() == 26 / 255 and color:green() == 128 / 255 and color:blue() == 1, 'HEX updates picker')

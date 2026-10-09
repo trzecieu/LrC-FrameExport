@@ -10,6 +10,7 @@ local provider = {}
 local runtime = require 'Runtime'
 
 provider.exportPresetFields = {
+    { key = 'frameMode', default = 'outside' },
     { key = 'frameWidthPercent', default = 10 },
     { key = 'frameColor', default = '#FFFFFF' },
     { key = 'frameMagick', default = '' },
@@ -17,6 +18,7 @@ provider.exportPresetFields = {
 
 function provider.sectionForFilterInDialog(f, properties)
     local bind = LrView.bind
+    properties.frameMode = properties.frameMode or 'outside'
     local function detect()
         local manual = properties.frameMagick
         properties.frameMagickStatus = 'Searching for ImageMagick 7…'
@@ -33,9 +35,27 @@ function provider.sectionForFilterInDialog(f, properties)
         f:column {
             bind_to_object = properties,
             spacing = f:control_spacing(),
-            f:static_text { title = 'Equal border thickness in pixels on all four edges.' },
             f:row {
-                f:static_text { title = 'Canvas width increase (%)', width = 165 },
+                f:static_text { title = 'Border type', width = 165 },
+                f:popup_menu { value = bind 'frameMode', items = {
+                    { title = 'Outside (expand dimensions)', value = 'outside' },
+                    { title = 'Inside (cover edges)', value = 'inside' },
+                    { title = 'Outside (keep dimensions)', value = 'outside_fit' },
+                } },
+            },
+            f:static_text {
+                title = bind { key = 'frameMode', transform = function(mode)
+                    if mode == 'inside' then
+                        return 'Covers the photo edges. Keeps dimensions and does not resize the remaining photo.'
+                    elseif mode == 'outside_fit' then
+                        return 'Fits the entire photo without cropping. Keeps dimensions; margins may be wider on one axis.'
+                    end
+                    return 'Adds an equal border on every edge. Increases output dimensions without resizing the photo.'
+                end },
+                width_in_chars = 60, height_in_lines = -1,
+            },
+            f:row {
+                f:static_text { title = 'Border amount (%)', width = 165 },
                 f:edit_field { value = bind 'frameWidthPercent', width_in_chars = 8 },
             },
             f:row {
@@ -74,7 +94,7 @@ function provider.sectionForFilterInDialog(f, properties)
             },
             f:static_text { title = bind 'frameMagickStatus', width_in_chars = 60, height_in_lines = -1 },
             f:static_text { title = 'ImageMagick 7 • JPEG / TIFF • border after resizing and watermarking' },
-            f:static_text { title = '10% adds 5% of photo width to every edge, including top and bottom.' },
+            f:static_text { title = '10% sets a border thickness of 5% of the exported photo width.' },
         },
     }
 end
@@ -122,7 +142,7 @@ end
 
 local function processBatch(functionContext, filterContext)
     local p = filterContext.propertyTable
-    local options, validationError = Frame.validate(p.frameWidthPercent, p.frameColor, p.frameMagick)
+    local options, validationError = Frame.validate(p.frameWidthPercent, p.frameColor, p.frameMagick, p.frameMode)
     if options and options.width ~= 0 then
         local ok, path = LrTasks.pcall(Magick.find, options.executable, WIN_ENV)
         if ok then options.executable = path else options, validationError = nil, tostring(path) end
